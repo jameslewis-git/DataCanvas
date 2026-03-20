@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useSession, signOut } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Database, Sparkles, LogIn, LogOut, Layout } from "lucide-react"
 import { FileUploader } from "@/components/FileUploader"
@@ -79,17 +80,43 @@ function Header({ user }: { user?: { name?: string | null; email?: string | null
 
 export default function Home() {
   const { data: session } = useSession()
+  const router = useRouter()
   const [data, setData] = useState<DataRow[]>([])
   const [filename, setFilename] = useState("")
+  const [isSaved, setIsSaved] = useState(false)
 
   const handleDataLoaded = (loadedData: DataRow[], loadedFilename: string) => {
     setData(loadedData)
     setFilename(loadedFilename)
+    setIsSaved(false)
   }
 
   const handleClear = () => {
     setData([])
     setFilename("")
+    setIsSaved(false)
+  }
+
+  const handleSave = async () => {
+    if (!session?.user || !data.length) return
+    const response = await fetch("/api/files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: filename,
+        size: new Blob([JSON.stringify(data)]).size,
+        type: filename.endsWith(".json") ? "application/json" : "text/csv",
+        data,
+        metadata: {
+          rowCount: data.length,
+          columns: data.length > 0 ? Object.keys(data[0] || {}) : [],
+        },
+      }),
+    })
+    if (!response.ok) throw new Error("Failed to save")
+    await response.json()
+    setIsSaved(true)
+    setTimeout(() => router.push(`/dashboard`), 1500)
   }
 
   return (
@@ -186,6 +213,8 @@ export default function Home() {
                   data={data}
                   filename={filename}
                   onClear={handleClear}
+                  onSave={session?.user ? handleSave : undefined}
+                  isSaved={isSaved}
                 />
               </motion.div>
             )}

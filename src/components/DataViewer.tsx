@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { LayoutGrid, Table, List, FileJson, FileSpreadsheet, X, BarChart3 } from "lucide-react"
+import { LayoutGrid, Table, List, FileJson, FileSpreadsheet, X, BarChart3, Save, Check, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DataRow, exportToJson, exportToCsv } from "@/lib/parser"
 import { TableView } from "@/components/TableView"
@@ -14,6 +14,8 @@ interface DataViewerProps {
   data: DataRow[]
   filename: string
   onClear: () => void
+  onSave?: () => Promise<void>
+  isSaved?: boolean
 }
 
 function ListView({ data }: { data: DataRow[] }) {
@@ -87,8 +89,19 @@ function StatsBar({ data }: { data: DataRow[] }) {
   )
 }
 
-export function DataViewer({ data, filename, onClear }: DataViewerProps) {
+export function DataViewer({ data, filename, onClear, onSave, isSaved }: DataViewerProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("grid")
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!onSave || saving || isSaved) return
+    setSaving(true)
+    try {
+      await onSave()
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const handleExportJson = () => {
     const json = exportToJson(data)
@@ -150,6 +163,26 @@ export function DataViewer({ data, filename, onClear }: DataViewerProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {onSave && (
+            <button
+              onClick={handleSave}
+              disabled={saving || isSaved}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                isSaved
+                  ? "bg-green-500/20 text-green-400 border border-green-500/30 cursor-default"
+                  : "bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50"
+              )}
+            >
+              {isSaved ? (
+                <><Check className="w-4 h-4" /> Saved!</>
+              ) : saving ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+              ) : (
+                <><Save className="w-4 h-4" /> Save to Dashboard</>
+              )}
+            </button>
+          )}
           <button
             onClick={handleExportJson}
             className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm font-medium text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors"
