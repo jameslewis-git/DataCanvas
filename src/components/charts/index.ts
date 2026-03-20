@@ -1,0 +1,6 @@
+export { BarChartWidget } from "./BarChart"
+export { LineChartWidget } from "./LineChart"
+export { PieChartWidget, DonutChartWidget } from "./PieChart"
+export { AreaChartWidget } from "./AreaChart"
+export { ScatterChartWidget } from "./ScatterChart"
+export { GaugeChartWidget } from "./GaugeChart"
