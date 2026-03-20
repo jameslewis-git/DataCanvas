@@ -18,7 +18,11 @@ import {
 } from "lucide-react"
 import { DataRow } from "@/lib/parser"
 import { analyzeDataset, VisualizationSuggestion, ChartType } from "@/lib/analytics"
-import { BarChartWidget, LineChartWidget, PieChartWidget, DonutChartWidget, AreaChartWidget, ScatterChartWidget, GaugeChartWidget } from "@/components/charts"
+import { 
+  BarChartWidget, LineChartWidget, PieChartWidget, DonutChartWidget, 
+  AreaChartWidget, ScatterChartWidget, GaugeChartWidget,
+  RadarChartWidget, TreemapChartWidget, FunnelChartWidget, HeatmapChartWidget
+} from "@/components/charts"
 
 interface DashboardFile {
   id: string
@@ -49,8 +53,8 @@ function VisualizationCard({
     scatter: <BarChart3 className="w-6 h-6" />,
     gauge: <BarChart3 className="w-6 h-6" />,
     radar: <BarChart3 className="w-6 h-6" />,
-    heatmap: <BarChart3 className="w-6 h-6" />,
-    treemap: <BarChart3 className="w-6 h-6" />,
+    heatmap: <LayoutGrid className="w-6 h-6" />,
+    treemap: <LayoutGrid className="w-6 h-6" />,
     funnel: <BarChart3 className="w-6 h-6" />,
     bubble: <BarChart3 className="w-6 h-6" />,
   }
@@ -109,6 +113,15 @@ function DataChart({
     case "gauge":
       const avgValue = data.reduce((acc, row) => acc + (Number(row[yKey]) || 0), 0) / data.length
       return <GaugeChartWidget value={avgValue} />
+    case "radar":
+      return <RadarChartWidget data={data} xKey={xKey} yKey={yKey} />
+    case "treemap":
+      return <TreemapChartWidget data={data} xKey={xKey} yKey={yKey} />
+    case "funnel":
+      return <FunnelChartWidget data={data} xKey={xKey} yKey={yKey} />
+    case "heatmap":
+      const thirdKey = columns[2] ?? yKey
+      return <HeatmapChartWidget data={data} xKey={xKey} yKey={yKey} valueKey={thirdKey} />
     default:
       return <BarChartWidget data={data} xKey={xKey} yKey={yKey} />
   }

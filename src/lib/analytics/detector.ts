@@ -190,7 +190,7 @@ export function analyzeDataset(data: DataRow[]): DatasetAnalysis {
   }))
   
   const analyzedColumns = columnData.map(col => analyzeColumn(col.name, col.values))
-  const suggestions = suggestVisualizations(analyzedColumns)
+  const suggestions = suggestVisualizations(analyzedColumns, data)
   const insights = generateInsights(analyzedColumns)
   
   return {
@@ -202,7 +202,7 @@ export function analyzeDataset(data: DataRow[]): DatasetAnalysis {
   }
 }
 
-function suggestVisualizations(columns: ColumnAnalysis[]): VisualizationSuggestion[] {
+function suggestVisualizations(columns: ColumnAnalysis[], data: DataRow[]): VisualizationSuggestion[] {
   const suggestions: VisualizationSuggestion[] = []
   
   const numericColumns = columns.filter(c => c.type === "number" || c.type === "currency" || c.type === "percentage")
@@ -288,7 +288,39 @@ function suggestVisualizations(columns: ColumnAnalysis[]): VisualizationSuggesti
     }
   }
   
-  return suggestions.slice(0, 8)
+  if (numericColumns.length >= 3) {
+    suggestions.push({
+      type: "radar",
+      title: "Multi-Metric Comparison",
+      description: "Compare multiple metrics on a radar chart",
+      columns: numericColumns.slice(0, 6).map(c => c.name),
+      reason: "Great for comparing multiple numeric dimensions",
+    })
+  }
+  
+  if (categoryColumns.length > 0 && numericColumns.length > 0 && data.length > 3) {
+    const catCol = categoryColumns[0]
+    const numCol = numericColumns[0]
+    if (catCol && numCol) {
+      suggestions.push({
+        type: "treemap",
+        title: `${numCol.name} Proportions`,
+        description: "Show hierarchical proportions of categories",
+        columns: [catCol.name, numCol.name],
+        reason: "Visualizes part-to-whole relationships",
+      })
+      
+      suggestions.push({
+        type: "funnel",
+        title: `${numCol.name} Funnel`,
+        description: "Show decreasing values across stages",
+        columns: [catCol.name, numCol.name],
+        reason: "Ideal for showing conversion or filtering",
+      })
+    }
+  }
+  
+  return suggestions.slice(0, 10)
 }
 
 function generateInsights(columns: ColumnAnalysis[]): string[] {
