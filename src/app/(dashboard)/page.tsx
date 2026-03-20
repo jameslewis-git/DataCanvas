@@ -1,6 +1,7 @@
 "use client"
 
 import { useSession, signOut } from "next-auth/react"
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { 
   Database, 
@@ -12,38 +13,32 @@ import {
   FileJson,
   FileSpreadsheet,
   BarChart3,
-  Clock
+  Clock,
+  Loader2
 } from "lucide-react"
 import Link from "next/link"
 
-const mockDashboards = [
-  {
-    id: "1",
-    name: "Sales Analytics 2024",
-    description: "Quarterly sales data visualization",
-    type: "json",
-    lastModified: "2 hours ago",
-    chartCount: 5,
-  },
-  {
-    id: "2",
-    name: "Customer Demographics",
-    description: "Customer age and location breakdown",
-    type: "csv",
-    lastModified: "1 day ago",
-    chartCount: 8,
-  },
-  {
-    id: "3",
-    name: "Website Traffic",
-    description: "Monthly traffic analysis",
-    type: "json",
-    lastModified: "3 days ago",
-    chartCount: 4,
-  },
-]
+type FileRecord = {
+  id: string
+  name: string
+  size: number
+  type: string
+  metadata: Record<string, unknown> | null
+  createdAt: string
+  updatedAt: string
+}
 
-function DashboardCard({ dashboard }: { dashboard: typeof mockDashboards[0] }) {
+function FileCard({ file }: { file: FileRecord }) {
+  const isJson = file.type === "application/json" || file.name.endsWith(".json")
+  const updatedAt = new Date(file.updatedAt)
+  const now = new Date()
+  const diffMs = now.getTime() - updatedAt.getTime()
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffHours / 24)
+  const timeLabel = diffDays > 0 ? `${diffDays}d ago` : diffHours > 0 ? `${diffHours}h ago` : "Just now"
+  const sizeLabel = file.size < 1024 ? `${file.size} B` : file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(1)} KB` : `${(file.size / 1024 / 1024).toFixed(1)} MB`
+  const rowCount = (file.metadata as { rowCount?: number } | null)?.rowCount
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -56,28 +51,28 @@ function DashboardCard({ dashboard }: { dashboard: typeof mockDashboards[0] }) {
           <BarChart3 className="w-6 h-6 text-purple-400" />
         </div>
         <div className="flex items-center gap-2">
-          {dashboard.type === "json" ? (
+          {isJson ? (
             <FileJson className="w-4 h-4 text-purple-400" />
           ) : (
             <FileSpreadsheet className="w-4 h-4 text-green-400" />
           )}
+          <span className="text-xs text-zinc-500 uppercase font-medium">{isJson ? "JSON" : "CSV"}</span>
         </div>
       </div>
 
-      <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors">
-        {dashboard.name}
+      <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors truncate">
+        {file.name}
       </h3>
 
-      <p className="text-sm text-zinc-400 mb-4 line-clamp-2">
-        {dashboard.description}
-      </p>
-
-      <div className="flex items-center justify-between text-xs text-zinc-500">
+      <div className="flex items-center justify-between text-xs text-zinc-500 mt-4">
         <div className="flex items-center gap-1">
           <Clock className="w-3 h-3" />
-          {dashboard.lastModified}
+          {timeLabel}
         </div>
-        <div>{dashboard.chartCount} charts</div>
+        <div className="flex items-center gap-2">
+          {rowCount && <span>{rowCount} rows</span>}
+          <span>{sizeLabel}</span>
+        </div>
       </div>
     </motion.div>
   )
@@ -94,18 +89,17 @@ function EmptyState() {
         <Layout className="w-10 h-10 text-zinc-600" />
       </div>
       <h3 className="text-xl font-semibold text-white mb-2">
-        No Dashboards Yet
+        No Files Yet
       </h3>
       <p className="text-zinc-400 text-center max-w-md mb-8">
-        Create your first dashboard by uploading a JSON or CSV file. 
-        Transform your data into beautiful visualizations.
+        Upload your first JSON or CSV file to start visualizing your data.
       </p>
       <Link
         href="/"
         className="flex items-center gap-2 px-6 py-3 bg-purple-500 hover:bg-purple-600 rounded-xl font-semibold transition-colors"
       >
         <Plus className="w-5 h-5" />
-        Create Dashboard
+        Upload File
       </Link>
     </motion.div>
   )
@@ -189,6 +183,27 @@ function Header({ user }: { user: { name?: string | null; email?: string | null;
 
 export default function DashboardPage() {
   const { data: session } = useSession()
+  const [files, setFiles] = useState<FileRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!session?.user) return
+    const fetchFiles = async () => {
+      try {
+        setLoading(true)
+        const res = await fetch("/api/files")
+        if (!res.ok) throw new Error(`Failed to fetch files: ${res.status}`)
+        const data = await res.json()
+        setFiles(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load files")
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchFiles()
+  }, [session])
 
   if (!session?.user) {
     return (
@@ -212,14 +227,28 @@ export default function DashboardPage() {
             Your Dashboards
           </h1>
           <p className="text-zinc-400">
-            Manage and view all your data visualization dashboards
+            Manage and view all your uploaded data files
           </p>
         </motion.div>
 
-        {mockDashboards.length > 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <p className="text-red-400 mb-4">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-xl text-sm font-medium transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        ) : files.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {mockDashboards.map((dashboard) => (
-              <DashboardCard key={dashboard.id} dashboard={dashboard} />
+            {files.map((file) => (
+              <FileCard key={file.id} file={file} />
             ))}
           </div>
         ) : (
