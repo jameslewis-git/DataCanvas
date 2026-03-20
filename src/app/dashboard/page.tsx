@@ -240,15 +240,20 @@ function Header({ user }: { user: { name?: string | null; email?: string | null;
 }
 
 export default function DashboardPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const [files, setFiles] = useState<DashboardFile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (status === "loading") return
+    if (status === "unauthenticated") {
+      router.push("/auth/signin")
+      return
+    }
     fetchFiles()
-  }, [])
+  }, [status])
 
   async function fetchFiles() {
     try {
@@ -262,7 +267,7 @@ export default function DashboardPage() {
         throw new Error("Failed to fetch files")
       }
       const data = await response.json()
-      setFiles(data)
+      setFiles(Array.isArray(data) ? data : [])
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
     } finally {
@@ -282,6 +287,17 @@ export default function DashboardPage() {
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to delete")
     }
+  }
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-zinc-400">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!session?.user) {
