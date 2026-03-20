@@ -2,8 +2,10 @@
 
 import { useCallback, useState } from "react"
 import { useDropzone } from "react-dropzone"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { Upload, FileJson, FileSpreadsheet, X, Loader2 } from "lucide-react"
+import { Upload, FileJson, FileSpreadsheet, X, Loader2, Save, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { parseJsonFile, parseCsvFile, DataRow } from "@/lib/parser"
 
@@ -12,14 +14,20 @@ interface FileUploaderProps {
 }
 
 export function FileUploader({ onDataLoaded }: FileUploaderProps) {
+  const { data: session } = useSession()
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isSaved, setIsSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [fileData, setFileData] = useState<DataRow[] | null>(null)
 
   const processFile = async (file: File) => {
     setIsLoading(true)
     setError(null)
     setSelectedFile(file)
+    setIsSaved(false)
 
     try {
       const ext = file.name.split(".").pop()?.toLowerCase()
@@ -33,12 +41,51 @@ export function FileUploader({ onDataLoaded }: FileUploaderProps) {
         throw new Error("Unsupported file type. Please use JSON or CSV.")
       }
 
+      setFileData(data)
       onDataLoaded(data, file.name)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to parse file")
       setSelectedFile(null)
+      setFileData(null)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const saveToDatabase = async () => {
+    if (!session || !selectedFile || !fileData) return
+
+    setIsSaving(true)
+    try {
+      const response = await fetch("/api/files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: selectedFile.name,
+          size: selectedFile.size,
+          type: selectedFile.name.endsWith(".json") ? "application/json" : "text/csv",
+          data: fileData,
+          metadata: {
+            rowCount: fileData.length,
+            columns: fileData.length > 0 ? Object.keys(fileData[0] || {}) : [],
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to save file")
+      }
+
+      const savedFile = await response.json()
+      setIsSaved(true)
+      
+      setTimeout(() => {
+        router.push(`/dashboard/${savedFile.id}`)
+      }, 1000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save file")
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -62,6 +109,8 @@ export function FileUploader({ onDataLoaded }: FileUploaderProps) {
     e.stopPropagation()
     setSelectedFile(null)
     setError(null)
+    setFileData(null)
+    setIsSaved(false)
   }
 
   return (
@@ -101,8 +150,55 @@ export function FileUploader({ onDataLoaded }: FileUploaderProps) {
               <p className="text-white font-medium text-lg">{selectedFile.name}</p>
               <p className="text-zinc-400 text-sm">
                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                {fileData && ` • ${fileData.length} rows`}
               </p>
             </div>
+            
+            {session && fileData && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2"
+              >
+                {isSaved ? (
+                  <button
+                    disabled
+                    className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-xl font-medium"
+                  >
+                    <Check className="w-4 h-4" />
+                    Saved! Opening...
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      saveToDatabase()
+                    }}
+                    disabled={isSaving}
+                    className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Dashboard
+                      </>
+                    )}
+                  </button>
+                )}
+              </motion.div>
+            )}
+            
+            {!session && (
+              <p className="text-sm text-zinc-500">
+                <a href="/auth/signin" className="text-purple-400 hover:underline">Sign in</a> to save your dashboard
+              </p>
+            )}
+
             <button
               onClick={clearFile}
               className="p-2 rounded-full bg-zinc-800 hover:bg-zinc-700 transition-colors"

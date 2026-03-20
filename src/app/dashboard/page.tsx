@@ -1,6 +1,7 @@
 "use client"
 
 import { useSession, signOut } from "next-auth/react"
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { 
   Database, 
@@ -12,72 +13,123 @@ import {
   FileJson,
   FileSpreadsheet,
   BarChart3,
-  Clock
+  Clock,
+  Trash2,
+  MoreVertical,
+  ExternalLink
 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
-const mockDashboards = [
-  {
-    id: "1",
-    name: "Sales Analytics 2024",
-    description: "Quarterly sales data visualization",
-    type: "json",
-    lastModified: "2 hours ago",
-    chartCount: 5,
-  },
-  {
-    id: "2",
-    name: "Customer Demographics",
-    description: "Customer age and location breakdown",
-    type: "csv",
-    lastModified: "1 day ago",
-    chartCount: 8,
-  },
-  {
-    id: "3",
-    name: "Website Traffic",
-    description: "Monthly traffic analysis",
-    type: "json",
-    lastModified: "3 days ago",
-    chartCount: 4,
-  },
-]
+interface DashboardFile {
+  id: string
+  name: string
+  size: number
+  type: string
+  metadata: Record<string, unknown> | null
+  createdAt: string
+  updatedAt: string
+  _count?: {
+    widgets: number
+  }
+}
 
-function DashboardCard({ dashboard }: { dashboard: typeof mockDashboards[0] }) {
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + " B"
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB"
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return "Just now"
+  if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? "s" : ""} ago`
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`
+  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`
+  return date.toLocaleDateString()
+}
+
+function DashboardCard({ 
+  file, 
+  onDelete 
+}: { 
+  file: DashboardFile
+  onDelete: (id: string) => void
+}) {
+  const [showMenu, setShowMenu] = useState(false)
+  const isJson = file.type === "application/json"
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4 }}
-      className="group bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 hover:border-purple-500/50 transition-all cursor-pointer"
+      className="group relative bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 hover:border-purple-500/50 transition-all"
     >
       <div className="flex items-start justify-between mb-4">
         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
           <BarChart3 className="w-6 h-6 text-purple-400" />
         </div>
-        <div className="flex items-center gap-2">
-          {dashboard.type === "json" ? (
-            <FileJson className="w-4 h-4 text-purple-400" />
-          ) : (
-            <FileSpreadsheet className="w-4 h-4 text-green-400" />
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="p-2 rounded-lg hover:bg-zinc-800 transition-colors opacity-0 group-hover:opacity-100"
+          >
+            <MoreVertical className="w-4 h-4 text-zinc-400" />
+          </button>
+          
+          {showMenu && (
+            <div className="absolute right-0 top-full mt-1 w-40 py-1 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-10">
+              <Link
+                href={`/dashboard/${file.id}`}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open
+              </Link>
+              <button
+                onClick={() => {
+                  setShowMenu(false)
+                  onDelete(file.id)
+                }}
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-zinc-800 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            </div>
           )}
         </div>
       </div>
 
-      <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors">
-        {dashboard.name}
-      </h3>
+      <Link href={`/dashboard/${file.id}`}>
+        <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors">
+          {file.name}
+        </h3>
+      </Link>
 
-      <p className="text-sm text-zinc-400 mb-4 line-clamp-2">
-        {dashboard.description}
+      <p className="text-sm text-zinc-400 mb-4">
+        {formatFileSize(file.size)}
       </p>
 
       <div className="flex items-center justify-between text-xs text-zinc-500">
         <div className="flex items-center gap-1">
           <Clock className="w-3 h-3" />
-          {dashboard.lastModified}
+          {formatDate(file.updatedAt)}
         </div>
-        <div>{dashboard.chartCount} charts</div>
+        <div className="flex items-center gap-1">
+          {isJson ? (
+            <FileJson className="w-4 h-4 text-purple-400" />
+          ) : (
+            <FileSpreadsheet className="w-4 h-4 text-green-400" />
+          )}
+        </div>
       </div>
     </motion.div>
   )
@@ -189,6 +241,48 @@ function Header({ user }: { user: { name?: string | null; email?: string | null;
 
 export default function DashboardPage() {
   const { data: session } = useSession()
+  const router = useRouter()
+  const [files, setFiles] = useState<DashboardFile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchFiles()
+  }, [])
+
+  async function fetchFiles() {
+    try {
+      setLoading(true)
+      const response = await fetch("/api/files")
+      if (!response.ok) {
+        if (response.status === 401) {
+          router.push("/auth/signin")
+          return
+        }
+        throw new Error("Failed to fetch files")
+      }
+      const data = await response.json()
+      setFiles(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Are you sure you want to delete this dashboard?")) return
+    
+    try {
+      const response = await fetch(`/api/files/${id}`, {
+        method: "DELETE",
+      })
+      if (!response.ok) throw new Error("Failed to delete")
+      setFiles(files.filter(f => f.id !== id))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete")
+    }
+  }
 
   if (!session?.user) {
     return (
@@ -216,10 +310,24 @@ export default function DashboardPage() {
           </p>
         </motion.div>
 
-        {mockDashboards.length > 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-20">
+            <p className="text-red-400 mb-4">{error}</p>
+            <button
+              onClick={fetchFiles}
+              className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : files.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {mockDashboards.map((dashboard) => (
-              <DashboardCard key={dashboard.id} dashboard={dashboard} />
+            {files.map((file) => (
+              <DashboardCard key={file.id} file={file} onDelete={handleDelete} />
             ))}
           </div>
         ) : (

@@ -61,7 +61,7 @@ model Dashboard {
   id          String      @id @default(cuid())
   name        String
   description String?
-  config      Json
+  config      Json        @default("{}")
   thumbnail   String?
   isPublic    Boolean     @default(false)
   shareToken  String?     @unique
