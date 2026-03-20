@@ -8,8 +8,6 @@ import Link from "next/link"
 import { 
   Database, 
   ArrowLeft, 
-  Download,
-  Share2,
   BarChart3,
   LineChart,
   PieChart,
@@ -23,6 +21,8 @@ import {
   AreaChartWidget, ScatterChartWidget, GaugeChartWidget,
   RadarChartWidget, TreemapChartWidget, FunnelChartWidget, HeatmapChartWidget
 } from "@/components/charts"
+import { ExportMenu } from "@/components/ExportMenu"
+import { exportToPng, exportToPdf, exportToCsv, exportToJson } from "@/lib/export"
 
 interface DashboardFile {
   id: string
@@ -127,7 +127,14 @@ function DataChart({
   }
 }
 
-function Header() {
+interface HeaderProps {
+  onExportPng: () => Promise<void>
+  onExportPdf: () => Promise<void>
+  onExportCsv: () => void
+  onExportJson: () => void
+}
+
+function Header({ onExportPng, onExportPdf, onExportCsv, onExportJson }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -142,14 +149,12 @@ function Header() {
         </Link>
 
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium transition-colors">
-            <Share2 className="w-4 h-4" />
-            Share
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium transition-colors">
-            <Download className="w-4 h-4" />
-            Export
-          </button>
+          <ExportMenu 
+            onExportPng={onExportPng}
+            onExportPdf={onExportPdf}
+            onExportCsv={onExportCsv}
+            onExportJson={onExportJson}
+          />
         </div>
       </div>
     </header>
@@ -259,11 +264,40 @@ export default function DashboardViewPage() {
     )
   }
 
+  const handleExportPng = async () => {
+    const name = file.name.replace(/\.[^/.]+$/, "")
+    await exportToPng("dashboard-content", name)
+  }
+
+  const handleExportPdf = async () => {
+    const name = file.name.replace(/\.[^/.]+$/, "")
+    await exportToPdf("dashboard-content", name)
+  }
+
+  const handleExportCsv = () => {
+    if (file.data) {
+      const name = file.name.replace(/\.[^/.]+$/, "")
+      exportToCsv(file.data, name)
+    }
+  }
+
+  const handleExportJson = () => {
+    if (file.data) {
+      const name = file.name.replace(/\.[^/.]+$/, "")
+      exportToJson(file.data, name)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950">
-      <Header />
+      <Header 
+        onExportPng={handleExportPng}
+        onExportPdf={handleExportPdf}
+        onExportCsv={handleExportCsv}
+        onExportJson={handleExportJson}
+      />
 
-      <div className="border-b border-zinc-800 bg-zinc-900/30">
+      <div id="dashboard-content" className="border-b border-zinc-800 bg-zinc-900/30">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">{file.name}</h1>
