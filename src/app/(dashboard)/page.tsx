@@ -40,43 +40,46 @@ function FileCard({ file }: { file: FileRecord }) {
   const rowCount = (file.metadata as { rowCount?: number } | null)?.rowCount
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4 }}
-      className="group bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 hover:border-purple-500/50 transition-all cursor-pointer"
-    >
-      <div className="flex items-start justify-between mb-4">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
-          <BarChart3 className="w-6 h-6 text-purple-400" />
+    <Link href={`/dashboard/${file.id}`}>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        whileHover={{ y: -4 }}
+        className="group bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 hover:border-purple-500/50 transition-all cursor-pointer"
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+            <BarChart3 className="w-6 h-6 text-purple-400" />
+          </div>
+          <div className="flex items-center gap-2">
+            {isJson ? (
+              <FileJson className="w-4 h-4 text-purple-400" />
+            ) : (
+              <FileSpreadsheet className="w-4 h-4 text-green-400" />
+            )}
+            <span className="text-xs text-zinc-500 uppercase font-medium">{isJson ? "JSON" : "CSV"}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {isJson ? (
-            <FileJson className="w-4 h-4 text-purple-400" />
-          ) : (
-            <FileSpreadsheet className="w-4 h-4 text-green-400" />
-          )}
-          <span className="text-xs text-zinc-500 uppercase font-medium">{isJson ? "JSON" : "CSV"}</span>
-        </div>
-      </div>
 
-      <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors truncate">
-        {file.name}
-      </h3>
+        <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors truncate">
+          {file.name}
+        </h3>
 
-      <div className="flex items-center justify-between text-xs text-zinc-500 mt-4">
-        <div className="flex items-center gap-1">
-          <Clock className="w-3 h-3" />
-          {timeLabel}
+        <div className="flex items-center justify-between text-xs text-zinc-500 mt-4">
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {timeLabel}
+          </div>
+          <div className="flex items-center gap-2">
+            {rowCount && <span>{rowCount} rows</span>}
+            <span>{sizeLabel}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {rowCount && <span>{rowCount} rows</span>}
-          <span>{sizeLabel}</span>
-        </div>
-      </div>
-    </motion.div>
+      </motion.div>
+    </Link>
   )
 }
+
 
 function EmptyState() {
   return (
