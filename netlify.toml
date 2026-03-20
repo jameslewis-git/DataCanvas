@@ -1,6 +1,11 @@
 [build]
-  command = "npm run build"
+  command = "npx prisma generate && npm run build"
   publish = ".next"
+
+[dev]
+  command = "npm run dev"
+  port = 3000
+  targetPort = 3000
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
