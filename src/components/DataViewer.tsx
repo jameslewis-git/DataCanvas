@@ -7,8 +7,9 @@ import { cn } from "@/lib/utils"
 import { DataRow, exportToJson, exportToCsv } from "@/lib/parser"
 import { TableView } from "@/components/TableView"
 import { GridView } from "@/components/GridView"
+import { AnalyticsDashboard } from "@/components/AnalyticsDashboard"
 
-type ViewMode = "table" | "grid" | "list"
+type ViewMode = "table" | "grid" | "list" | "analytics"
 
 interface DataViewerProps {
   data: DataRow[]
@@ -129,6 +130,7 @@ export function DataViewer({ data, filename, onClear, onSave, isSaved }: DataVie
     { mode: "table", icon: <Table className="w-5 h-5" />, label: "Table" },
     { mode: "grid", icon: <LayoutGrid className="w-5 h-5" />, label: "Grid" },
     { mode: "list", icon: <List className="w-5 h-5" />, label: "List" },
+    { mode: "analytics", icon: <BarChart3 className="w-5 h-5" />, label: "Analytics" },
   ]
 
   return (
@@ -221,6 +223,7 @@ export function DataViewer({ data, filename, onClear, onSave, isSaved }: DataVie
             {viewMode === "table" && <TableView data={data} />}
             {viewMode === "grid" && <GridView data={data} />}
             {viewMode === "list" && <ListView data={data} />}
+            {viewMode === "analytics" && <AnalyticsDashboard data={data} />}
           </motion.div>
         </AnimatePresence>
       </div>
