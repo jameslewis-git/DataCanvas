@@ -1,0 +1,13 @@
+.git
+.github
+.next
+node_modules
+.env
+.env.local
+.env*.local
+*.md
+.netlify
+netlify.toml
+Dockerfile
+.dockerignore
+prisma/migrations
