@@ -65,6 +65,7 @@ function ListView({ data }: { data: DataRow[] }) {
         <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
             const row = filteredData[virtualRow.index]
+            if (!row) return null
             return (
               <div
                 key={virtualRow.key}
