@@ -3,7 +3,7 @@
 import { useMemo, useState, useRef } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { motion, AnimatePresence } from "framer-motion"
-import { Search, Star, MapPin, Globe, Phone, ExternalLink, X } from "lucide-react"
+import { Search, ExternalLink, X } from "lucide-react"
 import { formatNumber, truncate } from "@/lib/utils"
 import { DataRow } from "@/lib/parser"
 
@@ -11,23 +11,30 @@ interface GridViewProps {
   data: DataRow[]
 }
 
+// Returns the first non-empty string value in the row as the card title (data-agnostic)
 function getCardTitle(row: DataRow): string {
-  return (row.title as string) || (row.name as string) || (row.title as string) || "Untitled"
+  const strEntry = Object.entries(row).find(([, v]) => typeof v === "string" && String(v).trim().length > 0)
+  if (strEntry) return String(strEntry[1])
+  const numEntry = Object.entries(row).find(([, v]) => typeof v === "number")
+  return numEntry ? String(numEntry[1]) : "Row"
 }
 
+// Returns the second non-empty string value as a subtitle (data-agnostic)
 function getCardSubtitle(row: DataRow): string {
-  return (row.categoryName as string) || (row.category as string) || (row.type as string) || ""
+  const strEntries = Object.entries(row).filter(([, v]) => typeof v === "string" && String(v).trim().length > 0)
+  return strEntries[1] ? String(strEntries[1][1]) : ""
 }
 
-function getCardDetails(row: DataRow): { icon: React.ReactNode; label: string; value: string }[] {
-  const details: { icon: React.ReactNode; label: string; value: string }[] = []
-
-  if (row.address) details.push({ icon: <MapPin className="w-4 h-4" />, label: "Address", value: row.address as string })
-  if (row.website) details.push({ icon: <Globe className="w-4 h-4" />, label: "Website", value: row.website as string })
-  if (row.phone) details.push({ icon: <Phone className="w-4 h-4" />, label: "Phone", value: row.phone as string })
-  if (row.totalScore) details.push({ icon: <Star className="w-4 h-4" />, label: "Rating", value: String(row.totalScore) })
-
-  return details.slice(0, 4)
+// Returns remaining fields as label/value pairs for the card body (data-agnostic)
+function getCardDetails(row: DataRow): { label: string; value: string }[] {
+  const strEntries = Object.entries(row).filter(([, v]) => typeof v === "string" && String(v).trim().length > 0)
+  const titleKey = strEntries[0]?.[0]
+  const subtitleKey = strEntries[1]?.[0]
+  return Object.entries(row)
+    .filter(([k]) => k !== titleKey && k !== subtitleKey)
+    .filter(([, v]) => v !== null && v !== undefined && v !== "")
+    .slice(0, 4)
+    .map(([k, v]) => ({ label: k, value: String(v) }))
 }
 
 function Card({ row, onClick }: { row: DataRow; onClick: () => void }) {
@@ -49,22 +56,16 @@ function Card({ row, onClick }: { row: DataRow; onClick: () => void }) {
             {title}
           </h3>
           {subtitle && (
-            <p className="text-sm text-zinc-400 mt-1">{subtitle}</p>
+            <p className="text-sm text-zinc-400 mt-1 truncate">{subtitle}</p>
           )}
         </div>
-        {Boolean(row.totalScore) && (
-          <div className="flex items-center gap-1 px-2.5 py-1 bg-yellow-500/10 rounded-full">
-            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-            <span className="text-sm font-medium text-yellow-500">{String(row.totalScore)}</span>
-          </div>
-        )}
       </div>
 
       <div className="space-y-2">
         {details.slice(0, 3).map((detail, i) => (
-          <div key={i} className="flex items-center gap-2 text-sm text-zinc-400">
-            <span className="text-zinc-600">{detail.icon}</span>
-            <span className="truncate">{truncate(detail.value, 40)}</span>
+          <div key={i} className="flex items-center gap-2 text-sm">
+            <span className="text-zinc-500 text-xs font-medium capitalize min-w-[60px] truncate">{detail.label}:</span>
+            <span className="text-zinc-300 truncate">{truncate(detail.value, 35)}</span>
           </div>
         ))}
       </div>
@@ -129,14 +130,15 @@ export function GridView({ data }: GridViewProps) {
     )
   }, [data, search])
 
+  const columns = 3
+
+  // FIX: count must be number of virtual rows (each row holds `columns` cards), not total items
   const rowVirtualizer = useVirtualizer({
-    count: filteredData.length,
+    count: Math.ceil(filteredData.length / columns),
     getScrollElement: () => parentRef.current,
     estimateSize: () => 220,
     overscan: 5,
   })
-
-  const columns = 3
 
   return (
     <div className="flex flex-col h-full">

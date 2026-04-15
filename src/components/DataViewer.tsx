@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { LayoutGrid, Table, List, FileJson, FileSpreadsheet, X, BarChart3, Save, Check, Loader2 } from "lucide-react"
+import { LayoutGrid, Table, List, FileJson, FileSpreadsheet, X, BarChart3, Save, Check, Loader2, Search } from "lucide-react"
+import { useVirtualizer } from "@tanstack/react-virtual"
 import { cn } from "@/lib/utils"
 import { DataRow, exportToJson, exportToCsv } from "@/lib/parser"
 import { TableView } from "@/components/TableView"
@@ -20,35 +21,87 @@ interface DataViewerProps {
 }
 
 function ListView({ data }: { data: DataRow[] }) {
-  const getTitle = (row: DataRow) => row.title as string || row.name as string || "Untitled"
-  const getSubtitle = (row: DataRow) => row.categoryName as string || row.category as string || ""
-  const getDescription = (row: DataRow) => row.address as string || row.description as string || ""
+  const [search, setSearch] = useState("")
+  const parentRef = useRef<HTMLDivElement>(null)
+
+  // Data-agnostic helpers: use positional string fields rather than hardcoded names
+  const getStrEntries = (row: DataRow) =>
+    Object.entries(row).filter(([, v]) => typeof v === "string" && String(v).trim().length > 0)
+  const getTitle = (row: DataRow) => { const e = getStrEntries(row); return e[0] ? String(e[0][1]) : "Row" }
+  const getSubtitle = (row: DataRow) => { const e = getStrEntries(row); return e[1] ? String(e[1][1]) : "" }
+  const getDescription = (row: DataRow) => { const e = getStrEntries(row); return e[2] ? String(e[2][1]) : "" }
+
+  const filteredData = useMemo(() => {
+    if (!search) return data
+    const s = search.toLowerCase()
+    return data.filter((row) => Object.values(row).some((v) => String(v).toLowerCase().includes(s)))
+  }, [data, search])
+
+  // Virtualize: only render rows visible in the viewport
+  const rowVirtualizer = useVirtualizer({
+    count: filteredData.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 84,
+    overscan: 10,
+  })
 
   return (
-    <div className="flex flex-col h-full overflow-auto p-4 space-y-2">
-      {data.map((row, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: i * 0.01 }}
-          className="flex items-center gap-4 p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl hover:border-purple-500/30 hover:bg-zinc-900 transition-all cursor-pointer"
-        >
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
-            <span className="text-purple-400 font-bold">{i + 1}</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-white truncate">{getTitle(row)}</h4>
-            <p className="text-sm text-zinc-400 truncate">{getSubtitle(row)}</p>
-            <p className="text-sm text-zinc-500 truncate mt-1">{getDescription(row)}</p>
-          </div>
-          {Boolean(row.totalScore) && (
-            <div className="flex items-center gap-1 px-3 py-1 bg-yellow-500/10 rounded-full">
-              <span className="text-yellow-500 text-sm font-medium">{String(row.totalScore)}</span>
-            </div>
-          )}
-        </motion.div>
-      ))}
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-4 p-4 border-b border-zinc-800">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+          <input
+            type="text"
+            placeholder="Search list..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500/50"
+          />
+        </div>
+        <span className="text-zinc-500 text-sm">{filteredData.length.toLocaleString()} results</span>
+      </div>
+
+      <div ref={parentRef} className="flex-1 overflow-auto p-4">
+        <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            const row = filteredData[virtualRow.index]
+            return (
+              <div
+                key={virtualRow.key}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: virtualRow.size,
+                  transform: `translateY(${virtualRow.start}px)`,
+                  paddingBottom: "8px",
+                }}
+              >
+                <div className="flex items-center gap-4 p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl hover:border-purple-500/30 hover:bg-zinc-900 transition-all cursor-pointer h-full">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-purple-400 font-bold text-sm">{virtualRow.index + 1}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-white truncate">{getTitle(row)}</h4>
+                    <p className="text-sm text-zinc-400 truncate">{getSubtitle(row)}</p>
+                    {getDescription(row) && (
+                      <p className="text-sm text-zinc-500 truncate mt-0.5">{getDescription(row)}</p>
+                    )}
+                  </div>
+                  {Object.entries(row).find(([, v]) => typeof v === "number") && (
+                    <div className="flex items-center gap-1 px-3 py-1 bg-purple-500/10 rounded-full flex-shrink-0">
+                      <span className="text-purple-400 text-sm font-medium">
+                        {String(Object.entries(row).find(([, v]) => typeof v === "number")?.[1] ?? "")}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
